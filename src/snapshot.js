@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 QuincyLeo (Gilgamesh-lzq)
+ * Copyright (c) 2026 QuincyLeo (Quincy-Leo)
  * SPDX-License-Identifier: MIT
  */
 

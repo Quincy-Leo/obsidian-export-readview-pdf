@@ -1,0 +1,13 @@
+{
+  "name": "obsidian-export-readview-pdf",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Export Obsidian's active reading view to PDF.",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --external:obsidian --format=cjs --platform=node --target=es2018 --outfile=main.js",
+    "check": "npm run build && node --check main.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

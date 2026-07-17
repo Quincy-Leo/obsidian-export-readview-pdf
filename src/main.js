@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 QuincyLeo (Gilgamesh-lzq)
+ * Copyright (c) 2026 QuincyLeo (Quincy-Leo)
  * SPDX-License-Identifier: MIT
  */
 
@@ -11,8 +11,11 @@ const {
     Plugin,
     setTooltip,
 } = require("obsidian");
-const fs = require("fs");
-const path = require("path");
+const {
+    ExportReadViewPdfSettingTab,
+    ExportReadViewPdfSettings,
+} = require("./settings");
+const { ExportReadViewPdfJob } = require("./export");
 
 const PLUGIN_VERSION = "0.4.0";
 const EXPORT_COMMAND_ID = "export-read-view-pdf";
@@ -25,9 +28,6 @@ class ExportReadViewPdfPlugin extends Plugin {
         this.exporting = false;
         this.settings = null;
         this.settingsStore = null;
-        this.settingTabClass = null;
-        this.exportJobClass = null;
-        this.moduleLoader = null;
         this.exportJob = null;
         this.exportCommand = null;
         this.ribbonIconEl = null;
@@ -37,9 +37,12 @@ class ExportReadViewPdfPlugin extends Plugin {
     }
 
     async onload() {
-        this.loadPluginModules();
+        this.settingsStore = new ExportReadViewPdfSettings(this, () => {
+            this.settings = this.settingsStore.value;
+            this.refreshLocalizedEntryLabels();
+        });
         await this.loadSettings();
-        this.exportJob = new this.exportJobClass(this.app, PLUGIN_VERSION);
+        this.exportJob = new ExportReadViewPdfJob(this.app, PLUGIN_VERSION);
 
         this.exportCommand = this.addCommand({
             id: EXPORT_COMMAND_ID,
@@ -52,17 +55,13 @@ class ExportReadViewPdfPlugin extends Plugin {
             this.uiText.ribbonTitle,
             this.exportReadingView,
         );
-        this.addSettingTab(new this.settingTabClass(this.app, this.settingsStore));
+        this.addSettingTab(new ExportReadViewPdfSettingTab(this.app, this.settingsStore));
     }
 
     onunload() {
         if (this.exportJob) {
             this.exportJob.dispose();
             this.exportJob = null;
-        }
-        if (this.moduleLoader) {
-            this.moduleLoader.dispose();
-            this.moduleLoader = null;
         }
     }
 
@@ -73,18 +72,6 @@ class ExportReadViewPdfPlugin extends Plugin {
                 commandName: "将当前阅读视图导出为PDF",
                 ribbonTitle: "将当前阅读视图导出为PDF",
             };
-    }
-
-    loadPluginModules() {
-        this.moduleLoader = new PluginModuleLoader(this, require);
-        const settingsModule = this.moduleLoader.require("./settings");
-        const exportModule = this.moduleLoader.require("./export");
-        this.settingTabClass = settingsModule.ExportReadViewPdfSettingTab;
-        this.exportJobClass = exportModule.ExportReadViewPdfJob;
-        this.settingsStore = new settingsModule.ExportReadViewPdfSettings(this, () => {
-            this.settings = this.settingsStore.value;
-            this.refreshLocalizedEntryLabels();
-        });
     }
 
     async loadSettings() {
@@ -181,67 +168,6 @@ class ExportReadViewPdfPlugin extends Plugin {
         } finally {
             this.exporting = false;
         }
-    }
-}
-
-class PluginModuleLoader {
-    constructor(plugin, rootRequire) {
-        this.rootRequire = rootRequire;
-        this.directory = this.getPluginDirectory(plugin);
-        this.cache = new Map();
-    }
-
-    require(request, parentDirectory = this.directory) {
-        if (!request.startsWith(".") && !path.isAbsolute(request)) {
-            return this.rootRequire(request);
-        }
-
-        let filename = path.resolve(parentDirectory, request);
-        if (!path.extname(filename)) {
-            filename += ".js";
-        }
-        if (this.cache.has(filename)) {
-            return this.cache.get(filename).exports;
-        }
-
-        const module = { exports: {} };
-        this.cache.set(filename, module);
-        try {
-            const source = fs.readFileSync(filename, "utf8");
-            const localRequire = (childRequest) => (
-                this.require(childRequest, path.dirname(filename))
-            );
-            const execute = new Function(
-                "require",
-                "module",
-                "exports",
-                `${source}\n//# sourceURL=${encodeURI(filename)}`,
-            );
-            execute(localRequire, module, module.exports);
-            return module.exports;
-        } catch (error) {
-            this.cache.delete(filename);
-            throw error;
-        }
-    }
-
-    getPluginDirectory(plugin) {
-        const adapter = plugin.app && plugin.app.vault && plugin.app.vault.adapter;
-        const pluginDirectory = plugin.manifest && plugin.manifest.dir;
-        if (!adapter || !pluginDirectory) {
-            throw new Error("Could not resolve the plugin directory");
-        }
-        if (typeof adapter.getFullPath === "function") {
-            return adapter.getFullPath(pluginDirectory);
-        }
-        if (typeof adapter.getBasePath === "function") {
-            return path.join(adapter.getBasePath(), pluginDirectory);
-        }
-        throw new Error("The vault adapter does not expose a filesystem path");
-    }
-
-    dispose() {
-        this.cache.clear();
     }
 }
 
