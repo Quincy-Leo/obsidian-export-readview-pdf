@@ -1,0 +1,9 @@
+{
+  "id": "export-readview-pdf",
+  "name": "export-readview-pdf",
+  "version": "0.4.0",
+  "minAppVersion": "1.4.0",
+  "description": "Export the active reading view's live rendered DOM to PDF with Chromium's native print engine.",
+  "author": "QuincyLeo",
+  "isDesktopOnly": true
+}
