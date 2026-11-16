@@ -28,6 +28,8 @@ const LANGUAGE_OPTIONS = [
             displayHeaderFooterDesc: "在 PDF 中显示自定义页眉和页脚",
             printBackgroundName: "打印背景",
             printBackgroundDesc: "在 PDF 中保留背景颜色和背景图片",
+            pageBackgroundMatchesThemeName: "页面边距跟随主题背景",
+            pageBackgroundMatchesThemeDesc: "在 PDF 页面边距中使用 Obsidian 主题背景色，而不是默认白底",
             scaleName: "缩放比例",
             scaleDesc: "设置页面内容的缩放比例（0.1–2.0）",
             pageSizeName: "页面尺寸",
@@ -64,6 +66,8 @@ const LANGUAGE_OPTIONS = [
             displayHeaderFooterDesc: "Display custom headers and footers in the PDF.",
             printBackgroundName: "Print background",
             printBackgroundDesc: "Preserve background colors and images in the PDF.",
+            pageBackgroundMatchesThemeName: "Page margin follows theme",
+            pageBackgroundMatchesThemeDesc: "Use the Obsidian theme background color for PDF page margins instead of default white.",
             scaleName: "Scale",
             scaleDesc: "Set the page content scale (0.1–2.0).",
             pageSizeName: "Page size",
@@ -91,6 +95,7 @@ const DEFAULT_PDF_OPTIONS = {
     landscape: false,
     displayHeaderFooter: false,
     printBackground: true,
+    pageBackgroundMatchesTheme: true,
     scale: 1,
     pageSize: "A4",
     margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
@@ -114,6 +119,10 @@ class PdfOptions {
             printBackground: this.booleanOrDefault(
                 options.printBackground,
                 DEFAULT_PDF_OPTIONS.printBackground,
+            ),
+            pageBackgroundMatchesTheme: this.booleanOrDefault(
+                options.pageBackgroundMatchesTheme,
+                DEFAULT_PDF_OPTIONS.pageBackgroundMatchesTheme,
             ),
             scale: this.numberOrDefault(options.scale, DEFAULT_PDF_OPTIONS.scale, 0.1, 2),
             pageSize: PDF_PAGE_SIZES.includes(options.pageSize)
@@ -275,6 +284,7 @@ class ExportReadViewPdfSettingTab extends PluginSettingTab {
         this.addToggle("landscape", text.landscapeName, text.landscapeDesc);
         this.addToggle("displayHeaderFooter", text.displayHeaderFooterName, text.displayHeaderFooterDesc);
         this.addToggle("printBackground", text.printBackgroundName, text.printBackgroundDesc);
+        this.addToggle("pageBackgroundMatchesTheme", text.pageBackgroundMatchesThemeName, text.pageBackgroundMatchesThemeDesc);
 
         const scaleSetting = new Setting(this.containerEl)
             .setName(text.scaleName)

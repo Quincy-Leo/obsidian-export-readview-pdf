@@ -15,6 +15,7 @@ const EXPORT_FILE_SUFFIX = ".readview.pdf";
 const PDF_MINIMUM_MARGIN_INCHES = 0.1;
 const PDF_MAXIMUM_MARGIN_INCHES = 2;
 const PDF_HEADER_FOOTER_MINIMUM_MARGIN_INCHES = 0.5;
+const PDF_DEFAULT_DPI = 96;
 const PDF_HEADER_TEMPLATE = `
 <div style="
     box-sizing: border-box;
@@ -172,18 +173,6 @@ class PdfPrinter {
         const printOptions = PdfOptions.normalize(pdfOptions);
         let printWindow = null;
         try {
-            printWindow = this.createPrintWindow(sourceWindow, title);
-            this.printWindows.add(printWindow);
-
-            await printWindow.loadURL(blobUrl);
-            if (!printOptions.preferCSSPageSize) {
-                await this.clearReadableLineWidth(printWindow.webContents);
-            }
-            const layout = await this.waitForPrintableLayout(printWindow.webContents);
-            if (!layout || layout.height < 1 || layout.textLength < 1) {
-                throw new Error("The print window rendered an empty document");
-            }
-
             for (const side of ["top", "bottom", "left", "right"]) {
                 printOptions.margins[side] = Math.min(
                     PDF_MAXIMUM_MARGIN_INCHES,
@@ -201,6 +190,23 @@ class PdfPrinter {
                     PDF_HEADER_FOOTER_MINIMUM_MARGIN_INCHES,
                     printOptions.margins.bottom,
                 );
+            }
+
+            printWindow = this.createPrintWindow(sourceWindow, title);
+            this.printWindows.add(printWindow);
+
+            await printWindow.loadURL(blobUrl);
+            if (!printOptions.preferCSSPageSize) {
+                await this.clearReadableLineWidth(printWindow.webContents);
+            }
+            if (printOptions.pageBackgroundMatchesTheme) {
+                await this.applyPageBackgroundTheme(printWindow.webContents, printOptions.margins);
+                printOptions.margins.marginType = "none";
+            }
+
+            const layout = await this.waitForPrintableLayout(printWindow.webContents);
+            if (!layout || layout.height < 1 || layout.textLength < 1) {
+                throw new Error("The print window rendered an empty document");
             }
             const pdfBuffer = await printWindow.webContents.printToPDF(printOptions);
             return PdfPrinter.toVerifiedArrayBuffer(pdfBuffer);
@@ -244,6 +250,63 @@ class PdfPrinter {
                 style.id = "export-readview-full-width-style";
                 style.textContent = ${styleText};
                 document.head.appendChild(style);
+            })();
+        `);
+    }
+
+    async applyPageBackgroundTheme(webContents, margins) {
+        const backgroundColor = await webContents.executeJavaScript(`
+            (() => {
+                const rootStyle = getComputedStyle(document.documentElement);
+                const bodyStyle = getComputedStyle(document.body);
+                return rootStyle.getPropertyValue("--background-secondary").trim()
+                    || bodyStyle.getPropertyValue("--background-secondary").trim()
+                    || rootStyle.backgroundColor
+                    || bodyStyle.backgroundColor;
+            })();
+        `);
+        const resolvedBackgroundColor = typeof backgroundColor === "string"
+            && backgroundColor
+            && backgroundColor !== "rgba(0, 0, 0, 0)"
+            ? backgroundColor
+            : "#ffffff";
+        const backgroundColorText = JSON.stringify(resolvedBackgroundColor);
+        const PDF_PAGE_BACKGROUND_STYLE = `
+        @page {
+            background: ${resolvedBackgroundColor} !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+            margin: 0 !important;
+            padding: ${margins.left * PDF_DEFAULT_DPI}px ${margins.right * PDF_DEFAULT_DPI}px ${margins.bottom * PDF_DEFAULT_DPI}px ${margins.top * PDF_DEFAULT_DPI}px !important;
+        }
+
+        html,
+        body.export-readview-document,
+        .export-readview-root,
+        .export-readview-root.markdown-preview-view,
+        .export-readview-root .markdown-preview-view,
+        .export-readview-root.markdown-preview-sizer,
+        .export-readview-root .markdown-preview-sizer,
+        .export-readview-root.markdown-preview-section,
+        .export-readview-root .markdown-preview-section {
+            background: ${resolvedBackgroundColor} !important;
+            box-sizing: border-box;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }`;
+
+        const styleText = JSON.stringify(PDF_PAGE_BACKGROUND_STYLE);
+        await webContents.executeJavaScript(`
+            (() => {
+                const existingStyle = document.getElementById("export-readview-page-background-style");
+                if (existingStyle) existingStyle.remove();
+
+                const style = document.createElement("style");
+                style.id = "export-readview-page-background-style";
+                style.textContent = ${styleText};
+                document.head.appendChild(style);
+                document.documentElement.style.setProperty("background", ${backgroundColorText}, "important");
+                document.body.style.setProperty("background", ${backgroundColorText}, "important");
             })();
         `);
     }
